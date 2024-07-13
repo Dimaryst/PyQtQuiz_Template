@@ -1,10 +1,11 @@
 import sys
 import sqlite3
 import random
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QLabel, QCheckBox, QPushButton, QProgressBar
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QStatusBar, QTextEdit, QFileDialog,
+                             QLabel, QWidget, QHBoxLayout, QPushButton, QLineEdit,
+                             QRadioButton, QGridLayout, QFormLayout, QAction, QMessageBox, QVBoxLayout)
 from PyQt5.QtGui import QPixmap
 from PyQt5 import uic
-
 # Класс для основного окна приложения
 class QuizApp(QMainWindow):
     def __init__(self):
@@ -18,11 +19,12 @@ class QuizApp(QMainWindow):
         self.current_question_index = 0
         self.answers = [None] * self.total_questions
         
+        self.user_name = None
+        
         self.initUI()
         self.show_popup()
         
     def initUI(self):
-        self.serviceLabel.setVisible(False)
         self.NextQuestionButton.clicked.connect(self.next_question)
         self.PrevQuestionButton.clicked.connect(self.prev_question)
         self.pushButtonFinish.clicked.connect(self.finish_quiz)
@@ -34,6 +36,13 @@ class QuizApp(QMainWindow):
             self.checkBox_answer_2,
             self.checkBox_answer_3,
             self.checkBox_answer_4
+        ]
+
+        self.labels = [
+            self.label_1_answer,
+            self.label_2_answer,
+            self.label_3_answer,
+            self.label_4_answer
         ]
 
         for check_box in self.check_boxes:
@@ -63,14 +72,34 @@ class QuizApp(QMainWindow):
     def show_popup(self):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
-        msg.setText(f"Для прохождения теста необходимо набрать {self.pass_percent} процентов правильных ответов")
         msg.setWindowTitle("Информация")
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.buttonClicked.connect(self.start_test)
+
+        # Создаем виджет для отображения в QMessageBox
+        custom_widget = QWidget()
+        layout = QVBoxLayout()
+        custom_widget.setLayout(layout)
+
+        text_label = QLabel(f"Для прохождения теста необходимо набрать {self.pass_percent} процентов правильных ответов")
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Введите ваше имя")
+        
+        layout.addWidget(text_label)
+        layout.addWidget(self.name_input)
+        
+        msg.layout().addWidget(custom_widget, 0, 0)
+
+        self.ok_button = msg.addButton(QMessageBox.Ok)
+        self.ok_button.clicked.connect(self.start_test)
+
         msg.exec_()
         
-    def start_test(self, i):
-        pass  # Ничего не делаем, просто закрываем поп-ап
+    def start_test(self):
+        self.user_name = self.name_input.text().strip()
+        if not self.user_name:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, введите ваше имя перед началом теста.")
+            return
+
+        self.sender().parent().close()
 
     def closeEvent(self, event):
         self.conn.close()
@@ -85,18 +114,20 @@ class QuizApp(QMainWindow):
             pixmap = QPixmap()
             pixmap.loadFromData(question[7])
             self.labelImage.setPixmap(pixmap)
+            # self.labelImage.setAlignment(Qt.AlignCenter)  # Центровка изображения по центру
         else:
-            self.labelImage.clear()
+             pass
+            # self.labelImage.clear()
         
         # Обновляем варианты ответов
         answers = [question[2], question[3], question[4], question[5]]
-        for i, check_box in enumerate(self.check_boxes):
+        for i, (check_box, label) in enumerate(zip(self.check_boxes, self.labels)):
             if answers[i]:
-                check_box.setText(answers[i])
+                label.setText(answers[i])
                 check_box.setEnabled(True)
                 check_box.setChecked(False)
             else:
-                check_box.setText("")
+                label.setText("")
                 check_box.setEnabled(False)
         
         self.CounterQuestionsLabel.setText(f"Вопросов: {self.current_question_index + 1}/{self.total_questions}")
@@ -153,7 +184,8 @@ class QuizApp(QMainWindow):
 
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
-        msg.setText(f"Количество правильных ответов: {correct_answers}\n"
+        msg.setText(f"{self.user_name}, ваши результаты:\n\n"
+                    f"Количество правильных ответов: {correct_answers}\n"
                     f"Количество очков: {total_points}\n"
                     f"Максимально возможный бал: {max_points}\n"
                     f"{'Пройден' if passed else 'Не пройден'}")
